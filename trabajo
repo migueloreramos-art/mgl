@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduPortal — Plataforma de Unidades</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --c1: #FF6B35;
+    --c2: #F7C59F;
+    --c3: #EFEFD0;
+    --c4: #004E89;
+    --c5: #1A936F;
+    --c-purple: #7C3AED;
+    --c-danger: #EF4444;
+    --dark: #0D0D0D;
+    --dark2: #1A1A2E;
+    --card-bg: #16213E;
+    --card-border: rgba(255,107,53,0.25);
+    --text-main: #F0F0F0;
+    --text-muted: #A0A0B0;
+    --shadow: 0 8px 32px rgba(0,0,0,0.4);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--dark2);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ===== BACKGROUNDS ===== */
+  .bg-mesh {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 20%, rgba(255,107,53,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 90% 80%, rgba(124,58,237,0.10) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 50% 0%, rgba(0,78,137,0.15) 0%, transparent 50%);
+  }
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(255,107,53,0.04) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,107,53,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ===== PAGES ===== */
+  .page { position: relative; z-index: 1; display: none; min-height: 100vh; }
+  .page.active { display: flex; }
+
+  /* ===== LOGIN PAGE ===== */
+  #login-page {
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .login-card {
+    background: rgba(22,33,62,0.85);
+    backdrop-filter: blur(24px);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+  .login-logo {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 2.5rem;
+  }
+  .logo-icon {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, var(--c1), var(--c-purple));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .logo-text { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .logo-text span { color: var(--c1); }
+  .login-title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 0.5rem; }
+  .login-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 2rem; }
+  .field { margin-bottom: 1.2rem; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .field input {
+    width: 100%; padding: 0.85rem 1rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-main); font-family: 'DM Sans', sans-serif; font-size: 15px;
+    transition: border-color 0.2s, background 0.2s;
+    outline: none;
+  }
+  .field input:focus { border-color: var(--c1); background: rgba(255,107,53,0.08); }
+  .btn-primary {
+    width: 100%; padding: 0.95rem;
+    background: linear-gradient(135deg, var(--c1), #e8521e);
+    border: none; border-radius: var(--radius-sm);
+    color: white; font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+    margin-top: 0.5rem;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,107,53,0.4); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .error-msg {
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+    color: #FCA5A5; padding: 0.75rem 1rem; border-radius: var(--radius-sm);
+    font-size: 13px; margin-bottom: 1rem; display: none;
+  }
+  .setup-link { text-align: center; margin-top: 1.5rem; font-size: 13px; color: var(--text-muted); }
+  .setup-link a { color: var(--c1); text-decoration: none; font-weight: 500; cursor: pointer; }
+
+  /* ===== DASHBOARD PAGE ===== */
+  #dashboard-page {
+    flex-direction: column;
+    padding: 0;
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,13,13,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,107,53,0.15);
+    padding: 1rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+  .topbar-logo span { color: var(--c1); }
+  .role-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .role-badge.admin { background: rgba(255,107,53,0.2); color: var(--c1); border: 1px solid rgba(255,107,53,0.4); }
+  .role-badge.viewer { background: rgba(26,147,111,0.2); color: #4ADE80; border: 1px solid rgba(26,147,111,0.4); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-info { text-align: right; }
+  .user-info .name { font-size: 14px; font-weight: 600; }
+  .user-info .email { font-size: 11px; color: var(--text-muted); }
+  .btn-logout {
+    padding: 8px 16px; background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3); border-radius: 8px;
+    color: #FCA5A5; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-logout:hover { background: rgba(239,68,68,0.25); }
+  .dashboard-content {
+    flex: 1; padding: 3rem 2rem;
+    max-width: 1000px; margin: 0 auto; width: 100%;
+  }
+  .dashboard-greeting { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; margin-bottom: 0.5rem; }
+  .dashboard-greeting span { color: var(--c1); }
+  .dashboard-sub { color: var(--text-muted); font-size: 15px; margin-bottom: 3rem; }
+  .units-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+  .unit-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 2rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    overflow: hidden;
+  }
+  .unit-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .unit-card:nth-child(1)::before { background: linear-gradient(135deg, rgba(255,107,53,0.15), transparent); }
+  .unit-card:nth-child(2)::before { background: linear-gradient(135deg, rgba(124,58,237,0.15), transparent); }
+  .unit-card:nth-child(3)::before { background: linear-gradient(135deg, rgba(0,78,137,0.20), transparent); }
+  .unit-card:nth-child(4)::before { background: linear-gradient(135deg, rgba(26,147,111,0.15), transparent); }
+  .unit-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+  .unit-card:hover::before { opacity: 1; }
+  .unit-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; margin-bottom: 1.5rem;
+  }
+  .unit-card:nth-child(1) .unit-icon { background: rgba(255,107,53,0.2); }
+  .unit-card:nth-child(2) .unit-icon { background: rgba(124,58,237,0.2); }
+  .unit-card:nth-child(3) .unit-icon { background: rgba(0,78,137,0.25); }
+  .unit-card:nth-child(4) .unit-icon { background: rgba(26,147,111,0.2); }
+  .unit-num { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+  .unit-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .unit-count { font-size: 12px; color: var(--text-muted); margin-top: 1rem; }
+  .unit-arrow { position: absolute; right: 1.5rem; bottom: 1.5rem; opacity: 0; transform: translateX(-8px); transition: all 0.3s; font-size: 20px; }
+  .unit-card:hover .unit-arrow { opacity: 1; transform: translateX(0); }
+
+  /* ===== UNIT PAGE ===== */
+  #unit-page { flex-direction: column; }
+  .unit-header {
+    background: rgba(13,13,13,0.85); backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,107,53,0.15);
+    padding: 1.2rem 2rem;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .btn-back {
+    padding: 8px 14px; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    color: var(--text-main); font-size: 13px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-back:hover { background: rgba(255,255,255,0.1); }
+  .unit-header-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; }
+  .unit-header-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-left: auto;
+  }
+  .unit-content { flex: 1; padding: 2.5rem 2rem; max-width: 900px; margin: 0 auto; width: 100%; }
+  .unit-section-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 0.5rem; }
+  .unit-section-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 2rem; }
+
+  /* Upload area (admin only) */
+  .upload-zone {
+    border: 2px dashed rgba(255,107,53,0.4);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    background: rgba(255,107,53,0.04);
+    margin-bottom: 2rem;
+    transition: all 0.2s; cursor: pointer;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--c1); background: rgba(255,107,53,0.08); }
+  .upload-icon { font-size: 36px; margin-bottom: 1rem; }
+  .upload-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  .upload-sub { color: var(--text-muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .upload-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .type-badge {
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    background: rgba(255,255,255,0.08); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-upload {
+    padding: 0.7rem 1.5rem;
+    background: linear-gradient(135deg, var(--c1), #e8521e);
+    border: none; border-radius: 10px;
+    color: white; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-upload:hover { box-shadow: 0 6px 20px rgba(255,107,53,0.4); transform: translateY(-1px); }
+
+  /* File name input */
+  .name-input-row { display: flex; gap: 10px; margin-bottom: 1.5rem; align-items: flex-end; }
+  .name-input-row .field { flex: 1; margin-bottom: 0; }
+  .btn-save {
+    padding: 0.85rem 1.4rem;
+    background: var(--c5);
+    border: none; border-radius: 10px;
+    color: white; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-save:hover { background: #138a5f; }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Files list */
+  .files-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem;
+  }
+  .files-label { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+  .files-count { font-size: 12px; color: var(--text-muted); }
+  .file-list { display: flex; flex-direction: column; gap: 10px; }
+  .file-item {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    display: flex; align-items: center; gap: 14px;
+    transition: border-color 0.2s;
+  }
+  .file-item:hover { border-color: rgba(255,107,53,0.3); }
+  .file-type-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .type-pdf { background: rgba(239,68,68,0.15); }
+  .type-word { background: rgba(0,78,137,0.2); }
+  .type-excel { background: rgba(26,147,111,0.2); }
+  .type-ppt { background: rgba(255,107,53,0.15); }
+  .type-img { background: rgba(124,58,237,0.15); }
+  .type-other { background: rgba(160,160,176,0.1); }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn-icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-muted); cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-icon:hover { border-color: var(--c1); color: var(--c1); background: rgba(255,107,53,0.1); }
+  .btn-icon.del:hover { border-color: var(--c-danger); color: #FCA5A5; background: rgba(239,68,68,0.1); }
+  .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+  .empty-state .empty-icon { font-size: 48px; margin-bottom: 1rem; opacity: 0.4; }
+  .empty-state p { font-size: 14px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;
+    padding: 1rem 1.5rem; border-radius: 12px;
+    font-size: 14px; font-weight: 500;
+    transform: translateY(100px); opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: rgba(26,147,111,0.9); color: white; border: 1px solid rgba(74,222,128,0.3); }
+  .toast.error { background: rgba(239,68,68,0.9); color: white; border: 1px solid rgba(252,165,165,0.3); }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block; width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Supabase setup panel */
+  .setup-panel {
+    background: rgba(22,33,62,0.9); backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,107,53,0.3); border-radius: 16px;
+    padding: 1.5rem; margin-top: 1.5rem;
+  }
+  .setup-panel h3 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 0.75rem; color: var(--c1); }
+  .setup-panel p { font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-bottom: 0.75rem; }
+  .setup-panel code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: monospace; color: var(--c2); }
+  #setup-form { display: none; margin-top: 0.5rem; }
+
+  /* Color accents per unit */
+  .accent-1 { color: var(--c1); }
+  .accent-2 { color: #A78BFA; }
+  .accent-3 { color: #60A5FA; }
+  .accent-4 { color: #4ADE80; }
+  .badge-1 { background: rgba(255,107,53,0.2); color: var(--c1); border-color: rgba(255,107,53,0.4); }
+  .badge-2 { background: rgba(167,139,250,0.2); color: #A78BFA; border-color: rgba(167,139,250,0.4); }
+  .badge-3 { background: rgba(96,165,250,0.2); color: #60A5FA; border-color: rgba(96,165,250,0.4); }
+  .badge-4 { background: rgba(74,222,128,0.2); color: #4ADE80; border-color: rgba(74,222,128,0.4); }
+
+  @media (max-width: 600px) {
+    .login-card { padding: 2rem 1.5rem; }
+    .dashboard-greeting { font-size: 26px; }
+    .units-grid { grid-template-columns: 1fr 1fr; }
+    .topbar { padding: 1rem; }
+    .user-info { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="bg-grid"></div>
+
+<!-- ===== LOGIN PAGE ===== -->
+<div class="page active" id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">📚</div>
+      <div class="logo-text">Edu<span>Portal</span></div>
+    </div>
+    <div class="login-title">Bienvenido</div>
+    <div class="login-sub">Ingresa con tu cuenta para acceder a las unidades</div>
+    <div class="error-msg" id="login-error"></div>
+    <div class="field">
+      <label>Correo electrónico</label>
+      <input type="email" id="email-input" placeholder="tu@correo.com" />
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="pass-input" placeholder="••••••••" />
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">Ingresar</button>
+    <div class="setup-link">¿Primera vez? <a onclick="toggleSetup()">Configurar Supabase</a></div>
+    <div class="setup-panel" id="setup-panel" style="display:none">
+      <h3>⚡ Configuración rápida</h3>
+      <p>Para usar esta app necesitas una cuenta gratuita en <code>supabase.com</code>. Ingresa tu URL y clave pública:</p>
+      <button class="btn-upload" style="font-size:13px;padding:6px 14px;" onclick="document.getElementById('setup-form').style.display='block'">Agregar credenciales</button>
+      <div id="setup-form">
+        <div class="field" style="margin-top:1rem">
+          <label>Supabase URL</label>
+          <input type="text" id="sb-url" placeholder="https://xxxx.supabase.co" />
+        </div>
+        <div class="field">
+          <label>Supabase Anon Key</label>
+          <input type="text" id="sb-key" placeholder="eyJhbGciOi..." />
+        </div>
+        <button class="btn-save" style="width:100%;margin-top:0.5rem" onclick="saveCredentials()">Guardar y conectar</button>
+      </div>
+      <p style="margin-top:1rem;font-size:11px">📋 SQL para crear tablas: <a href="#" onclick="showSQL()" style="color:var(--c1)">ver script</a></p>
+      <div id="sql-block" style="display:none;margin-top:0.75rem">
+        <textarea readonly style="width:100%;height:200px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.75rem;color:#A0A0B0;font-size:11px;font-family:monospace;resize:none;" id="sql-text"></textarea>
+        <button class="btn-upload" style="font-size:12px;padding:5px 12px;margin-top:6px" onclick="copySQL()">Copiar SQL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD PAGE ===== -->
+<div class="page" id="dashboard-page">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">Edu<span>Portal</span></div>
+      <div class="role-badge" id="role-badge">—</div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-info">
+        <div class="name" id="user-name">—</div>
+        <div class="email" id="user-email">—</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">↩ Salir</button>
+    </div>
+  </div>
+  <div class="dashboard-content">
+    <div class="dashboard-greeting">Hola, <span id="greet-name">usuario</span> 👋</div>
+    <div class="dashboard-sub" id="role-desc">Selecciona una unidad para comenzar</div>
+    <div class="units-grid">
+      <div class="unit-card" onclick="openUnit(1)">
+        <div class="unit-icon">🔬</div>
+        <div class="unit-num">Unidad 01</div>
+        <div class="unit-title accent-1">Unidad 1</div>
+        <div class="unit-count" id="count-1">— archivos</div>
+        <div class="unit-arrow accent-1">→</div>
+      </div>
+      <div class="unit-card" onclick="openUnit(2)">
+        <div class="unit-icon">📐</div>
+        <div class="unit-num">Unidad 02</div>
+        <div class="unit-title accent-2">Unidad 2</div>
+        <div class="unit-count" id="count-2">— archivos</div>
+        <div class="unit-arrow accent-2">→</div>
+      </div>
+      <div class="unit-card" onclick="openUnit(3)">
+        <div class="unit-icon">🌍</div>
+        <div class="unit-num">Unidad 03</div>
+        <div class="unit-title accent-3">Unidad 3</div>
+        <div class="unit-count" id="count-3">— archivos</div>
+        <div class="unit-arrow accent-3">→</div>
+      </div>
+      <div class="unit-card" onclick="openUnit(4)">
+        <div class="unit-icon">⚡</div>
+        <div class="unit-num">Unidad 04</div>
+        <div class="unit-title accent-4">Unidad 4</div>
+        <div class="unit-count" id="count-4">— archivos</div>
+        <div class="unit-arrow accent-4">→</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== UNIT PAGE ===== -->
+<div class="page" id="unit-page">
+  <div class="unit-header">
+    <button class="btn-back" onclick="backToDashboard()">← Volver</button>
+    <div class="unit-header-title" id="unit-page-title">Unidad</div>
+    <div class="unit-header-badge" id="unit-header-badge"></div>
+  </div>
+  <div class="unit-content">
+    <div class="unit-section-title" id="unit-main-title">Unidad</div>
+    <div class="unit-section-sub">Gestiona los archivos de esta unidad</div>
+
+    <!-- Upload zone (admin only) -->
+    <div id="admin-upload" style="display:none">
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div class="upload-icon">📤</div>
+        <div class="upload-title">Arrastra archivos aquí o haz clic</div>
+        <div class="upload-sub">Sube materiales para esta unidad</div>
+        <div class="upload-types">
+          <span class="type-badge">PDF</span>
+          <span class="type-badge">Word</span>
+          <span class="type-badge">Excel</span>
+          <span class="type-badge">PowerPoint</span>
+          <span class="type-badge">Imágenes</span>
+          <span class="type-badge">Video</span>
+        </div>
+      </div>
+      <input type="file" id="file-input" style="display:none" multiple
+             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.mp4,.zip,.txt,.csv"
+             onchange="handleFileSelect(event)" />
+      <div id="pending-files"></div>
+    </div>
+
+    <!-- Files list -->
+    <div class="files-header">
+      <div class="files-label">Archivos disponibles</div>
+      <div class="files-count" id="files-count">Cargando…</div>
+    </div>
+    <div class="file-list" id="file-list">
+      <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <p>Cargando archivos…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== SUPABASE CONFIG =====
+let SUPABASE_URL = localStorage.getItem('sb_url') || '';
+let SUPABASE_KEY = localStorage.getItem('sb_key') || '';
+let supabase = null;
+
+const SQL_SCRIPT = `-- Ejecuta esto en el SQL Editor de Supabase
+
+-- Tabla de perfiles con roles
+create table if not exists profiles (
+  id uuid references auth.users on delete cascade primary key,
+  email text,
+  name text,
+  role text check (role in ('admin','viewer')) default 'viewer',
+  created_at timestamp with time zone default timezone('utc', now())
+);
+
+-- Activar RLS
+alter table profiles enable row level security;
+
+-- Políticas RLS
+create policy "Usuarios ven su propio perfil"
+  on profiles for select using (auth.uid() = id);
+
+create policy "Usuarios actualizan su perfil"
+  on profiles for update using (auth.uid() = id);
+
+create policy "Admins ven todos los perfiles"
+  on profiles for select using (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Tabla de archivos por unidad
+create table if not exists unit_files (
+  id uuid default gen_random_uuid() primary key,
+  unit_number int check (unit_number between 1 and 4),
+  display_name text not null,
+  file_name text not null,
+  file_path text not null,
+  file_size bigint,
+  file_type text,
+  uploaded_by uuid references auth.users,
+  created_at timestamp with time zone default timezone('utc', now())
+);
+
+alter table unit_files enable row level security;
+
+-- Todos los autenticados pueden ver
+create policy "Autenticados ven archivos"
+  on unit_files for select using (auth.role() = 'authenticated');
+
+-- Solo admins pueden insertar
+create policy "Admins insertan archivos"
+  on unit_files for insert with check (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Solo admins pueden eliminar
+create policy "Admins eliminan archivos"
+  on unit_files for delete using (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Storage bucket para archivos
+insert into storage.buckets (id, name, public)
+values ('unit-files', 'unit-files', true)
+on conflict do nothing;
+
+-- Trigger para crear perfil automáticamente al registrarse
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, name, role)
+  values (new.id, new.email, split_part(new.email, '@', 1), 'viewer');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Para hacer admin a un usuario (reemplaza el email):
+-- update profiles set role = 'admin' where email = 'admin@tudominio.com';
+`;
+
+function initSupabase() {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      return true;
+    } catch(e) { return false; }
+  }
+  return false;
+}
+
+// ===== STATE =====
+let currentUser = null;
+let currentRole = null;
+let currentUnit = null;
+let pendingFiles = [];
+
+// ===== PAGES =====
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ===== TOAST =====
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ===== SETUP =====
+function toggleSetup() {
+  const p = document.getElementById('setup-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+function showSQL() {
+  document.getElementById('sql-text').value = SQL_SCRIPT;
+  document.getElementById('sql-block').style.display = 'block';
+}
+function copySQL() {
+  navigator.clipboard.writeText(SQL_SCRIPT);
+  toast('SQL copiado al portapapeles ✓');
+}
+function saveCredentials() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Completa ambos campos', 'error'); return; }
+  SUPABASE_URL = url; SUPABASE_KEY = key;
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  initSupabase();
+  toast('Credenciales guardadas ✓');
+  document.getElementById('setup-panel').style.display = 'none';
+}
+
+// ===== AUTH =====
+async function doLogin() {
+  const email = document.getElementById('email-input').value.trim();
+  const pass = document.getElementById('pass-input').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+
+  if (!email || !pass) { showError('Completa todos los campos'); return; }
+  if (!initSupabase()) {
+    showError('Configura primero las credenciales de Supabase');
+    toggleSetup(); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Ingresar';
+    showError(error.message.includes('Invalid') ? 'Correo o contraseña incorrectos' : error.message);
+    return;
+  }
+
+  await loadUserProfile(data.user);
+  btn.disabled = false; btn.textContent = 'Ingresar';
+}
+
+function showError(msg) {
+  const e = document.getElementById('login-error');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+async function loadUserProfile(user) {
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  currentUser = { ...user, ...profile };
+  currentRole = profile?.role || 'viewer';
+
+  // Update UI
+  const name = profile?.name || user.email.split('@')[0];
+  document.getElementById('user-name').textContent = name;
+  document.getElementById('user-email').textContent = user.email;
+  document.getElementById('greet-name').textContent = name;
+  document.getElementById('role-badge').textContent = currentRole === 'admin' ? '👑 Administrador' : '👁 Visualizador';
+  document.getElementById('role-badge').className = 'role-badge ' + (currentRole === 'admin' ? 'admin' : 'viewer');
+  document.getElementById('role-desc').textContent = currentRole === 'admin'
+    ? 'Puedes subir y eliminar archivos en todas las unidades'
+    : 'Puedes visualizar y descargar los archivos disponibles';
+
+  loadFileCounts();
+  showPage('dashboard-page');
+  toast(`¡Bienvenido, ${name}! 🎉`);
+}
+
+async function doLogout() {
+  await supabase.auth.signOut();
+  currentUser = null; currentRole = null;
+  showPage('login-page');
+  toast('Sesión cerrada', 'success');
+}
+
+// ===== DASHBOARD =====
+async function loadFileCounts() {
+  for (let u = 1; u <= 4; u++) {
+    const { count } = await supabase.from('unit_files').select('*', { count:'exact', head:true }).eq('unit_number', u);
+    document.getElementById(`count-${u}`).textContent = `${count || 0} archivo${count !== 1 ? 's' : ''}`;
+  }
+}
+
+// ===== UNIT PAGE =====
+const unitAccents = ['', 'accent-1', 'accent-2', 'accent-3', 'accent-4'];
+const unitBadges  = ['', 'badge-1', 'badge-2', 'badge-3', 'badge-4'];
+
+async function openUnit(n) {
+  currentUnit = n;
+  const titles = ['', 'Unidad 1', 'Unidad 2', 'Unidad 3', 'Unidad 4'];
+  document.getElementById('unit-page-title').textContent = titles[n];
+  document.getElementById('unit-main-title').textContent = titles[n];
+  document.getElementById('unit-main-title').className = `unit-section-title ${unitAccents[n]}`;
+  const badge = document.getElementById('unit-header-badge');
+  badge.textContent = currentRole === 'admin' ? '👑 Administrador' : '👁 Visualizador';
+  badge.className = `unit-header-badge role-badge ${currentRole === 'admin' ? 'admin' : 'viewer'}`;
+
+  // Show/hide upload for admin
+  document.getElementById('admin-upload').style.display = currentRole === 'admin' ? 'block' : 'none';
+
+  pendingFiles = [];
+  renderPending();
+  showPage('unit-page');
+  await loadUnitFiles(n);
+}
+
+function backToDashboard() {
+  pendingFiles = [];
+  loadFileCounts();
+  showPage('dashboard-page');
+}
+
+// ===== FILES =====
+async function loadUnitFiles(unit) {
+  document.getElementById('files-count').textContent = 'Cargando…';
+  document.getElementById('file-list').innerHTML = '<div class="empty-state"><div class="empty-icon" style="font-size:32px;opacity:0.3">⏳</div><p>Cargando archivos…</p></div>';
+
+  const { data, error } = await supabase.from('unit_files')
+    .select('*').eq('unit_number', unit).order('created_at', { ascending: false });
+
+  if (error) { toast('Error al cargar archivos', 'error'); return; }
+
+  document.getElementById('files-count').textContent = `${data.length} archivo${data.length !== 1 ? 's' : ''}`;
+
+  if (data.length === 0) {
+    document.getElementById('file-list').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <p>${currentRole === 'admin' ? 'Aún no hay archivos. ¡Sube el primero!' : 'No hay archivos disponibles aún.'}</p>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('file-list').innerHTML = data.map(f => fileItemHTML(f)).join('');
+}
+
+function fileItemHTML(f) {
+  const icon = fileIcon(f.file_type);
+  const size = formatSize(f.file_size);
+  const date = new Date(f.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+  const delBtn = currentRole === 'admin'
+    ? `<button class="btn-icon del" onclick="deleteFile('${f.id}','${f.file_path}')" title="Eliminar">🗑</button>`
+    : '';
+  const { data } = supabase.storage.from('unit-files').getPublicUrl(f.file_path);
+  return `
+    <div class="file-item" id="file-${f.id}">
+      <div class="file-type-icon ${icon.cls}">${icon.emoji}</div>
+      <div class="file-info">
+        <div class="file-name">${f.display_name}</div>
+        <div class="file-meta">${f.file_name} · ${size} · ${date}</div>
+      </div>
+      <div class="file-actions">
+        <a href="${data.publicUrl}" target="_blank" download>
+          <button class="btn-icon" title="Descargar">⬇</button>
+        </a>
+        ${delBtn}
+      </div>
+    </div>`;
+}
+
+function fileIcon(type) {
+  if (!type) return { emoji: '📄', cls: 'type-other' };
+  if (type.includes('pdf')) return { emoji: '📕', cls: 'type-pdf' };
+  if (type.includes('word') || type.includes('document') || type.includes('msword')) return { emoji: '📘', cls: 'type-word' };
+  if (type.includes('excel') || type.includes('sheet')) return { emoji: '📗', cls: 'type-excel' };
+  if (type.includes('powerpoint') || type.includes('presentation')) return { emoji: '📙', cls: 'type-ppt' };
+  if (type.includes('image')) return { emoji: '🖼', cls: 'type-img' };
+  if (type.includes('video')) return { emoji: '🎬', cls: 'type-other' };
+  if (type.includes('zip') || type.includes('rar')) return { emoji: '🗜', cls: 'type-other' };
+  return { emoji: '📄', cls: 'type-other' };
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1048576).toFixed(1)} MB`;
+}
+
+// ===== UPLOAD =====
+function handleFileSelect(e) {
+  addToPending([...e.target.files]);
+  e.target.value = '';
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  addToPending([...e.dataTransfer.files]);
+}
+
+function addToPending(files) {
+  files.forEach(f => {
+    pendingFiles.push({ file: f, name: f.name.replace(/\.[^/.]+$/, ''), id: Math.random().toString(36).slice(2) });
+  });
+  renderPending();
+}
+
+function renderPending() {
+  const el = document.getElementById('pending-files');
+  if (pendingFiles.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="margin-bottom:1.5rem">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:1rem;color:var(--c2)">
+        📋 Archivos listos para subir (${pendingFiles.length})
+      </div>
+      ${pendingFiles.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:var(--card-bg);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 14px">
+          <div style="flex:1">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${p.file.name}</div>
+            <input class="field input" type="text" value="${p.name}" placeholder="Nombre a mostrar"
+                   onchange="updatePendingName('${p.id}',this.value)"
+                   style="width:100%;padding:6px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-main);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" />
+          </div>
+          <button class="btn-icon del" onclick="removePending('${p.id}')" title="Quitar">✕</button>
+        </div>`).join('')}
+      <button class="btn-save" onclick="uploadAll()" style="margin-top:0.5rem">
+        ⬆ Subir ${pendingFiles.length} archivo${pendingFiles.length>1?'s':''}
+      </button>
+    </div>`;
+}
+
+function updatePendingName(id, name) {
+  const p = pendingFiles.find(p => p.id === id);
+  if (p) p.name = name;
+}
+
+function removePending(id) {
+  pendingFiles = pendingFiles.filter(p => p.id !== id);
+  renderPending();
+}
+
+async function uploadAll() {
+  if (pendingFiles.length === 0) return;
+  const btn = document.querySelector('[onclick="uploadAll()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Subiendo…'; }
+
+  let success = 0;
+  for (const p of pendingFiles) {
+    const ext = p.file.name.split('.').pop();
+    const path = `unit-${currentUnit}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: storageErr } = await supabase.storage.from('unit-files').upload(path, p.file);
+    if (storageErr) { toast(`Error al subir ${p.name}`, 'error'); continue; }
+
+    const { error: dbErr } = await supabase.from('unit_files').insert({
+      unit_number: currentUnit,
+      display_name: p.name || p.file.name,
+      file_name: p.file.name,
+      file_path: path,
+      file_size: p.file.size,
+      file_type: p.file.type,
+      uploaded_by: currentUser.id
+    });
+    if (dbErr) { toast(`Error al registrar ${p.name}`, 'error'); continue; }
+    success++;
+  }
+
+  pendingFiles = [];
+  renderPending();
+  if (success > 0) toast(`${success} archivo${success>1?'s':''} subido${success>1?'s':''} ✓`);
+  await loadUnitFiles(currentUnit);
+}
+
+async function deleteFile(id, path) {
+  if (!confirm('¿Eliminar este archivo?')) return;
+  await supabase.storage.from('unit-files').remove([path]);
+  await supabase.from('unit_files').delete().eq('id', id);
+  document.getElementById(`file-${id}`)?.remove();
+  const list = document.getElementById('file-list');
+  if (!list.querySelector('.file-item')) await loadUnitFiles(currentUnit);
+  toast('Archivo eliminado');
+  loadFileCounts();
+}
+
+// ===== INIT =====
+(async function() {
+  document.getElementById('sql-text') && (document.getElementById('sql-text').value = SQL_SCRIPT);
+  if (!initSupabase()) return;
+
+  // Check existing session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) await loadUserProfile(session.user);
+
+  // Enter key on login
+  document.getElementById('pass-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pass-input').focus(); });
+})();
+</script>
+</body>
+</html>
